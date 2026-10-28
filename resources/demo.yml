@@ -1,0 +1,49 @@
+targets:
+  dev:
+    resources:
+      jobs:
+        generate_mock_data:
+          name: ecommerce_demo_${bundle.target}
+          max_concurrent_runs: 1
+          queue:
+            enabled: true
+          timeout_seconds: 10800
+          parameters:
+            - name: reset_demo_data
+              default: "false"
+            - name: seed
+              default: "42"
+          environments:
+            - environment_key: default
+              spec:
+                environment_version: ${var.serverless_environment_version}
+                dependencies:
+                  - ../dist/*.whl
+          tasks:
+            - task_key: generate
+              spark_python_task:
+                python_file: ../scripts/demo/generate_mock_data.py
+                parameters:
+                  - --catalog
+                  - ${resources.schemas.bronze.catalog_name}
+                  - --schema
+                  - ${resources.schemas.bronze.name}
+                  - --environment
+                  - dev
+                  - --reset-demo-data
+                  - "{{job.parameters.reset_demo_data}}"
+                  - --seed
+                  - "{{job.parameters.seed}}"
+              environment_key: default
+              timeout_seconds: 1200
+              max_retries: 0
+            - task_key: refresh
+              depends_on:
+                - task_key: generate
+              run_job_task:
+                job_id: ${resources.jobs.ecommerce_refresh.id}
+            - task_key: publish_semantic
+              depends_on:
+                - task_key: refresh
+              run_job_task:
+                job_id: ${resources.jobs.semantic_refresh.id}

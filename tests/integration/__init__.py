@@ -1,0 +1,1 @@
+"""Tests that require PySpark 4.0 and Java 17 or 21."""

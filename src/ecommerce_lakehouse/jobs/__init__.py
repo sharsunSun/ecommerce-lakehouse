@@ -1,0 +1,1 @@
+"""Independent initialization, semantic publication, and maintenance entry points."""

@@ -1,0 +1,21 @@
+resources:
+  pipelines:
+    ecommerce_lakehouse_main:
+      name: ${var.pipeline_name}
+      catalog: ${resources.schemas.gold.catalog_name}
+      schema: ${resources.schemas.gold.name}
+      continuous: false
+      serverless: true
+      edition: ADVANCED
+      root_path: ${workspace.file_path}/src
+      libraries:
+        - file:
+            path: ../src/pipelines/silver_layer.py
+        - file:
+            path: ../src/pipelines/gold_layer.py
+      configuration:
+        spark.sql.session.timeZone: UTC
+        ecommerce.catalog: ${resources.schemas.gold.catalog_name}
+        ecommerce.bronze_schema: ${resources.schemas.bronze.name}
+        ecommerce.silver_schema: ${resources.schemas.silver.name}
+        ecommerce.gold_schema: ${resources.schemas.gold.name}

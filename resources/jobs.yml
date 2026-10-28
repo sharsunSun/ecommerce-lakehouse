@@ -1,0 +1,104 @@
+resources:
+  jobs:
+    initialize_lakehouse:
+      name: ecommerce_initialize_${bundle.target}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: 1800
+      environments:
+        - &default_environment
+          environment_key: default
+          spec:
+            environment_version: ${var.serverless_environment_version}
+            dependencies:
+              - ../dist/*.whl
+      tasks:
+        - task_key: initialize_schemas
+          python_wheel_task:
+            package_name: ecommerce_lakehouse
+            entry_point: initialize
+            parameters:
+              - --catalog
+              - ${resources.schemas.gold.catalog_name}
+              - --bronze-schema
+              - ${resources.schemas.bronze.name}
+              - --silver-schema
+              - ${resources.schemas.silver.name}
+              - --gold-schema
+              - ${resources.schemas.gold.name}
+              - --semantic-schema
+              - ${resources.schemas.semantic.name}
+              - --rag-schema
+              - ${resources.schemas.rag.name}
+          environment_key: default
+          timeout_seconds: 1200
+          max_retries: 2
+          min_retry_interval_millis: 60000
+
+    ecommerce_refresh:
+      name: ecommerce_refresh_${bundle.target}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: 7200
+      tasks:
+        - task_key: refresh_silver_gold
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.ecommerce_lakehouse_main.id}
+            full_refresh: false
+          timeout_seconds: 5400
+          max_retries: 2
+          min_retry_interval_millis: 60000
+    semantic_refresh:
+      name: ecommerce_semantic_publish_${bundle.target}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: 1800
+      environments:
+        - *default_environment
+      tasks:
+        - task_key: publish_metric_views
+          python_wheel_task:
+            package_name: ecommerce_lakehouse
+            entry_point: publish_semantic
+            parameters:
+              - --catalog
+              - ${resources.schemas.semantic.catalog_name}
+              - --gold-schema
+              - ${resources.schemas.gold.name}
+              - --semantic-schema
+              - ${resources.schemas.semantic.name}
+          environment_key: default
+          timeout_seconds: 1200
+          max_retries: 2
+          min_retry_interval_millis: 60000
+
+    delta_maintenance:
+      name: ecommerce_delta_maintenance_${bundle.target}
+      max_concurrent_runs: 1
+      queue:
+        enabled: true
+      timeout_seconds: 3600
+      environments:
+        - *default_environment
+      tasks:
+        - task_key: optimize_bronze
+          python_wheel_task:
+            package_name: ecommerce_lakehouse
+            entry_point: maintain_delta
+            parameters:
+              - --catalog
+              - ${resources.schemas.bronze.catalog_name}
+              - --schema
+              - ${resources.schemas.bronze.name}
+              - --tables
+              - orders_raw
+              - users_raw
+              - products_raw
+              - clickstream_raw
+          environment_key: default
+          timeout_seconds: 3000
+          max_retries: 1
+          min_retry_interval_millis: 60000

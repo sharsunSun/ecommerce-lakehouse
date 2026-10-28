@@ -1,0 +1,66 @@
+bundle:
+  name: ecommerce-lakehouse
+  engine: direct
+
+artifacts:
+  lakehouse:
+    type: whl
+    path: .
+    build: python3 -m build --wheel
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog; storage is managed outside this application bundle
+    default: ecommerce_lakehouse
+  bronze_schema:
+    default: bronze
+  silver_schema:
+    default: silver
+  gold_schema:
+    default: gold
+  semantic_schema:
+    default: semantic
+  rag_schema:
+    default: rag
+  pipeline_name:
+    default: ecommerce_lakehouse_main
+  serverless_environment_version:
+    description: Serverless Python environment version for Job tasks
+    default: "4"
+  prod_run_as_sp:
+    description: 生产环境运行身份，使用 Service Principal
+    default: ""
+
+include:
+  - resources/*.yml
+
+sync:
+  include:
+    - src/**
+    - scripts/**
+    - resources/**
+    - databricks.yml
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      host: https://dbc-ce7c05c5-a4d5.cloud.databricks.com
+      root_path: /Users/${workspace.current_user.userName}/bundles/ecommerce-lakehouse-dev
+    variables:
+      catalog: workspace
+      bronze_schema: ecommerce_bronze_dev
+      silver_schema: ecommerce_silver_dev
+      gold_schema: ecommerce_gold_dev
+      semantic_schema: ecommerce_semantic_dev
+      rag_schema: ecommerce_rag_dev
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Shared/prod/bundles/ecommerce-lakehouse-prod
+    run_as:
+      service_principal_name: ${var.prod_run_as_sp}
+    variables:
+      catalog: ecommerce_lakehouse

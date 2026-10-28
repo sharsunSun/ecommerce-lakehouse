@@ -1,0 +1,27 @@
+resources:
+  schemas:
+    bronze:
+      name: ${var.bronze_schema}
+      catalog_name: ${var.catalog}
+      lifecycle:
+        prevent_destroy: true
+    silver:
+      name: ${var.silver_schema}
+      catalog_name: ${var.catalog}
+      lifecycle:
+        prevent_destroy: true
+    gold:
+      name: ${var.gold_schema}
+      catalog_name: ${var.catalog}
+      lifecycle:
+        prevent_destroy: true
+    semantic:
+      name: ${var.semantic_schema}
+      catalog_name: ${var.catalog}
+      lifecycle:
+        prevent_destroy: true
+    rag:
+      name: ${var.rag_schema}
+      catalog_name: ${var.catalog}
+      lifecycle:
+        prevent_destroy: true

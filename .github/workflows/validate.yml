@@ -1,0 +1,83 @@
+name: Lakehouse Validation
+
+"on":
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_dev_smoke:
+        description: Deploy and run the dev demo; existing demo data is not overwritten
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e '.[dev]'
+      - run: python -m unittest discover -s tests/unit -v
+      - run: python -m build --wheel
+      - name: Verify the installed wheel independently of the source tree
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-env"
+          "$RUNNER_TEMP/wheel-env/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/wheel-env/bin/python" -I -c 'from importlib.metadata import distribution; from ecommerce_lakehouse.sql_resources import render_sql; package = distribution("ecommerce_lakehouse"); assert {entry.name for entry in package.entry_points} == {"initialize", "publish_semantic", "maintain_delta"}; assert all(callable(entry.load()) for entry in package.entry_points); assert "fact_order_wide" in render_sql("revenue_metrics.sql", catalog="ci_dev", gold_schema="gold", semantic_schema="semantic")'
+
+  spark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPARK_LOCAL_IP: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: python -m pip install -e '.[dev,spark]'
+      - run: python -m unittest discover -s tests/integration -v
+
+  bundle:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [unit, spark]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: databricks-dev
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: databricks/setup-cli@8de769ec2543ee05e456ee2121350efc7efc4bda
+        with:
+          version: "1.22.1"
+      - run: python -m pip install -e '.[dev]'
+      - run: python -m build --wheel
+      - name: Require workspace federation configuration
+        run: |
+          test -n "$DATABRICKS_HOST"
+          test -n "$DATABRICKS_CLIENT_ID"
+      - run: databricks bundle validate -t dev
+      - if: inputs.run_dev_smoke
+        run: databricks bundle deploy -t dev
+      - if: inputs.run_dev_smoke
+        run: databricks bundle run -t dev generate_mock_data
