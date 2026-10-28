@@ -4,7 +4,6 @@ resources:
       name: ${var.pipeline_name}
       catalog: ${resources.schemas.gold.catalog_name}
       schema: ${resources.schemas.gold.name}
-      continuous: false
       serverless: true
       edition: ADVANCED
       root_path: ${workspace.file_path}/src
