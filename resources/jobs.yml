@@ -38,6 +38,10 @@ resources:
 
     ecommerce_refresh:
       name: ecommerce_refresh_${bundle.target}
+      schedule:
+        quartz_cron_expression: "0 0 8 * * ?"
+        timezone_id: Asia/Shanghai
+        pause_status: UNPAUSED
       max_concurrent_runs: 1
       queue:
         enabled: true
@@ -77,6 +81,10 @@ resources:
 
     delta_maintenance:
       name: ecommerce_delta_maintenance_${bundle.target}
+      schedule:
+        quartz_cron_expression: "0 0 22 * * ?"
+        timezone_id: Asia/Shanghai
+        pause_status: UNPAUSED
       max_concurrent_runs: 1
       queue:
         enabled: true
@@ -98,6 +106,9 @@ resources:
               - users_raw
               - products_raw
               - clickstream_raw
+              - --vacuum
+              - --retention-hours
+              - "168"
           environment_key: default
           timeout_seconds: 3000
           max_retries: 1
